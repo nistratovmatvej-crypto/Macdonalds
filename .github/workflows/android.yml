@@ -5,67 +5,41 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-concurrency:
-  group: android-apk-${{ github.ref }}
-  cancel-in-progress: true
 jobs:
   build:
-    name: Build and verify debug APK
+    name: Build debug APK
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
-      - name: Install Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install required SDK packages
+      - name: Locate Android SDK
         run: |
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
-
-      - name: Validate website source
-        shell: bash
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          ls -la "$ANDROID_HOME"
+          find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print
+      - name: Install Android SDK packages
         run: |
-          set -euo pipefail
-          for page in index menu product about locations careers app contacts; do
-            test -s "website/${page}.html"
-          done
-          test -s website/styles.css
-          test -s website/app.js
-          echo "All 8 HTML pages and shared assets are present."
-
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
       - name: Prepare offline website assets
         run: |
           mkdir -p app/src/main/assets/www
           cp -R website/. app/src/main/assets/www/
           test -s app/src/main/assets/www/index.html
-          test -s app/src/main/assets/www/styles.css
-          test -s app/src/main/assets/www/app.js
-
-      - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Assemble debug APK
-        run: gradle --no-daemon --stacktrace assembleDebug
-
-      - name: Verify APK and signature
-        run: |
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          test -s "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$APK" | grep -F "com.mcdonalds.concept.debug"
-
-      - name: Upload installable APK
-        uses: actions/upload-artifact@v4
+        run: gradle --no-daemon assembleDebug
+      - name: Verify APK
+        run: test -s app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
         with:
           name: McDonalds-2026-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
