@@ -1,0 +1,14 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'com.mcdonalds.concept'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.mcdonalds.concept'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+}
